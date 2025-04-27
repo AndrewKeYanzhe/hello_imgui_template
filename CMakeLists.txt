@@ -44,8 +44,20 @@ option(EXAMPLE_INTEGRATION_PORTABLE_INSTALL "Install in a portable way" ON)
 
 if (EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
     # portable installation is the easiest way to install the app
+
+
+
     hello_imgui_add_app(hello_edr hello_edr.mm)
+    # Add include path and link path for libavif
+    # this assumes homebrew is installed in $HOME/homebrew. change if necessary
+    # brew install libavif
+    target_include_directories(hello_edr PRIVATE $ENV{HOME}/homebrew/include)
+    target_link_directories(hello_edr PRIVATE $ENV{HOME}/homebrew/lib)
+    target_link_libraries(hello_edr PRIVATE avif)
+
     hello_imgui_add_app(hello_world_ hello_world.main.cpp)
+
+
 else()
     # Disable HelloImGui default install behavior
     set(HELLOIMGUI_ADD_APP_WITH_INSTALL OFF CACHE BOOL "" FORCE)

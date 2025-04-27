@@ -23,6 +23,14 @@ make -j 8
 
 #include <cstdint>
 
+// Use extern "C" because avif.h is C code
+extern "C" {
+#include "avif/avif.h"
+}
+
+// Then you can start decoding/loading AVIF images
+
+
 namespace Float16_Emulation
 {
 uint16_t float32_to_float16(float value)
