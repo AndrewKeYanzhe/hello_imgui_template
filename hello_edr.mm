@@ -474,6 +474,8 @@ void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
     }
 }
 
+#import <Foundation/Foundation.h>
+
 
 struct AppState
 {
@@ -494,10 +496,12 @@ struct AppState
 
         //debug path, run binary within .app folder using terminal
         // hello_edr.app/Contents/MacOS/hello_edr
-        LoadAvifImageApple(&imageEdr, "../Resources/assets/sample.avif");
+        // LoadAvifImageApple(&imageEdr, "../Resources/assets/sample.avif");
 
+        NSString *p = [[NSBundle mainBundle] pathForResource:@"sample" ofType:@"avif" inDirectory:@"assets"];
+        if (p) LoadAvifImageApple(&imageEdr, [p UTF8String]);
 
-        // LoadAvifImageApple(&imageEdr, "./sample.avif");
+        // LoadAvifImageApple(imageEdr, "Resources/assets/sample.avif");
         imageMetal.StoreTextureFloat16Rgba(imageEdr.Width, imageEdr.Height, imageEdr.ImageData.data());
     }
 
