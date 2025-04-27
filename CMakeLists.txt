@@ -44,6 +44,7 @@ option(EXAMPLE_INTEGRATION_PORTABLE_INSTALL "Install in a portable way" ON)
 
 if (EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
     # portable installation is the easiest way to install the app
+    hello_imgui_add_app(hello_edr hello_edr.mm)
     hello_imgui_add_app(hello_world_ hello_world.main.cpp)
 else()
     # Disable HelloImGui default install behavior
