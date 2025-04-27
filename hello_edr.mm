@@ -491,7 +491,13 @@ struct AppState
     {
         // CreateFloatPattern(&imageEdr, maxR, maxG, maxB);
         // LoadAvifImage(&imageEdr, "../Resources/assets/sample.avif");
+
+        //debug path, run binary within .app folder using terminal
+        // hello_edr.app/Contents/MacOS/hello_edr
         LoadAvifImageApple(&imageEdr, "../Resources/assets/sample.avif");
+
+
+        // LoadAvifImageApple(&imageEdr, "./sample.avif");
         imageMetal.StoreTextureFloat16Rgba(imageEdr.Width, imageEdr.Height, imageEdr.ImageData.data());
     }
 
