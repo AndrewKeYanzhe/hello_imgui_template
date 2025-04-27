@@ -303,6 +303,28 @@ void CreateFloatPattern(ImageEdr* imageEdr, float maxR, float maxG, float maxB)
 //     avifDecoderDestroy(decoder);
 // }
 
+// Function to convert PQ EOTF to linear light
+float pqEotfToLinear(float pqValue) {
+    // Constants defined in ITU-R BT.2100
+    const float m1 = 0.1593017578125;  // 2610 / 16384
+    const float m2 = 78.84375;         // 2523 / 32
+    const float c1 = 0.8359375;        // 3424 / 4096
+    const float c2 = 18.8515625;       // 2413 / 128
+    const float c3 = 18.6875;          // 2392 / 128
+
+    // Convert PQ value to linear light
+    float linearValue = powf(fmaxf(powf(pqValue, 1.0f / m2) - c1, 0.0f) / (c2 - c3 * powf(pqValue, 1.0f / m2)), 1.0f / m1);
+
+    // hacky  inverse gamma correction, shouldnt need this if working properly
+    linearValue = powf(linearValue, 1.0f / 2.2f); // 
+    return linearValue * 5.0f;
+    
+
+    // Scale linear light to 1.0 = 100 nits
+    // return linearValue * 100.0f;
+    
+}
+
 void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
 {
     CFStringRef path = CFStringCreateWithCString(NULL, filePath, kCFStringEncodingUTF8);
@@ -347,10 +369,15 @@ void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
     std::vector<uint16_t> pixelBuffer(bufferSize / 2); // uint16_t buffer
 
     // Create color space (Device RGB)
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    // CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+    // CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+
+    // const CFStringRef name = kCGColorSpaceExtendedLinearSRGB;
+    // const CFStringRef name = kCGColorSpaceExtendedLinearITUR_2020;
+    // CGColorSpaceRef colorSpace = CGColorSpaceCreateWithName(name);
 
     // this will display pq encoded, grayish
-    // CGColorSpaceRef colorSpace = CGImageGetColorSpace(image);
+    CGColorSpaceRef colorSpace = CGImageGetColorSpace(image);
 
     // print colorspace of layer
     if (colorSpace != nullptr) {
@@ -403,6 +430,8 @@ void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
 
     // Draw the image into the context (this converts it to 16-bit RGBA)
     CGRect rect = CGRectMake(0, 0, width, height);
+
+    // this does color space conversion
     CGContextDrawImage(context, rect, image);
 
     CGImageRelease(image);
@@ -427,10 +456,15 @@ void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
             uint16_t a = pixelBuffer[bufferIndex + 3];
 
             // Normalize to 0.0 - 1.0 float and convert to float16
-            float rf = static_cast<float>(r) / maxValue;
-            float gf = static_cast<float>(g) / maxValue;
-            float bf = static_cast<float>(b) / maxValue;
+            // float rf = static_cast<float>(r) / maxValue;
+            // float gf = static_cast<float>(g) / maxValue;
+            // float bf = static_cast<float>(b) / maxValue;
+            // float af = static_cast<float>(a) / maxValue;
+            float rf = pqEotfToLinear(static_cast<float>(r) / maxValue);
+            float gf = pqEotfToLinear(static_cast<float>(g) / maxValue);
+            float bf = pqEotfToLinear(static_cast<float>(b) / maxValue);
             float af = static_cast<float>(a) / maxValue;
+
 
             imageEdr->ImageData[pixelIndex + 0] = Float16_Emulation::float32_to_float16(rf);
             imageEdr->ImageData[pixelIndex + 1] = Float16_Emulation::float32_to_float16(gf);
