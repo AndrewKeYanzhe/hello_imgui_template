@@ -53,7 +53,9 @@ if (EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
     # brew install libavif
     target_include_directories(hello_edr PRIVATE $ENV{HOME}/homebrew/include)
     target_link_directories(hello_edr PRIVATE $ENV{HOME}/homebrew/lib)
-    target_link_libraries(hello_edr PRIVATE avif)
+    target_link_libraries(hello_edr PRIVATE avif     "-framework CoreFoundation"
+    "-framework CoreGraphics"
+    "-framework ImageIO")
 
     hello_imgui_add_app(hello_world_ hello_world.main.cpp)
 

@@ -26,6 +26,10 @@ to see console logs, run
 
 #include <cstdint>
 
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <ImageIO/ImageIO.h>
+
 // Use extern "C" because avif.h is C code
 extern "C" {
 #include "avif/avif.h"
@@ -101,6 +105,8 @@ void CreateFloatPattern(ImageEdr* imageEdr, float maxR, float maxG, float maxB)
     }
 }
 
+
+// this function using libavif doesnt work, it fails to convert YUV to RGB
 void LoadAvifImage(ImageEdr* imageEdr, const char* filePath)
 {
     // Initialize AVIF decoder
@@ -129,6 +135,37 @@ void LoadAvifImage(ImageEdr* imageEdr, const char* filePath)
 
     avifImage* avifImg = decoder->image;
 
+    printf("AVIF Image Properties:\n");
+    printf("  Width: %u, Height: %u\n", avifImg->width, avifImg->height);
+    printf("  Depth: %u\n", avifImg->depth);
+    printf("  YUV Format: %d\n", avifImg->yuvFormat); // AVIF_PIXEL_FORMAT_... enum value
+    printf("  Color Primaries: %d\n", avifImg->colorPrimaries); // AVIF_COLOR_PRIMARIES_... enum value
+    printf("  Transfer Characteristics: %d\n", avifImg->transferCharacteristics); // AVIF_TRANSFER_CHARACTERISTICS_... enum value
+    printf("  Matrix Coefficients: %d\n", avifImg->matrixCoefficients); // AVIF_MATRIX_COEFFICIENTS_... enum value
+
+    // Print YUV format
+    printf("  YUV Format: %d (", avifImg->yuvFormat);
+    switch (avifImg->yuvFormat) {
+        case AVIF_PIXEL_FORMAT_YUV444:
+            printf("YUV444");
+            break;
+        case AVIF_PIXEL_FORMAT_YUV422:
+            printf("YUV422");
+            break;
+        case AVIF_PIXEL_FORMAT_YUV420:
+            printf("YUV420");
+            break;
+        case AVIF_PIXEL_FORMAT_YUV400:
+            printf("YUV400 (Monochrome)");
+            break;
+        default:
+            printf("Unknown");
+            break;
+    }
+    printf(")\n");
+
+
+    // 9-16-9 PQ gives YUV to RGB error. 1-13-9 also
     // Convert YUV to RGB
     avifRGBImage rgb;
     avifRGBImageSetDefaults(&rgb, avifImg);
@@ -179,6 +216,111 @@ void LoadAvifImage(ImageEdr* imageEdr, const char* filePath)
     avifDecoderDestroy(decoder);
 }
 
+void LoadAvifImageApple(ImageEdr* imageEdr, const char* filePath)
+{
+    CFStringRef path = CFStringCreateWithCString(NULL, filePath, kCFStringEncodingUTF8);
+    CFURLRef url = CFURLCreateWithFileSystemPath(NULL, path, kCFURLPOSIXPathStyle, false);
+    CFRelease(path);
+
+    if (!url) {
+        std::cerr << "Failed to create URL from file path\n";
+        return;
+    }
+
+    // Create CGImageSource for AVIF file
+    CGImageSourceRef source = CGImageSourceCreateWithURL(url, NULL);
+    CFRelease(url);
+    if (!source) {
+        std::cerr << "Failed to create CGImageSource from file\n";
+        return;
+    }
+
+    
+
+    // Create CGImage from source (first image)
+    CGImageRef image = CGImageSourceCreateImageAtIndex(source, 0, NULL);
+    CFRelease(source);
+    if (!image) {
+        std::cerr << "Failed to create CGImage from source\n";
+        return;
+    }
+
+    size_t width = CGImageGetWidth(image);
+    size_t height = CGImageGetHeight(image);
+
+    // We will create a 16-bit per channel RGBA bitmap context
+    size_t bytesPerPixel = 8; // 4 channels * 2 bytes (16-bit)
+    size_t bytesPerRow = bytesPerPixel * width;
+    size_t bufferSize = bytesPerRow * height;
+
+    std::vector<uint16_t> pixelBuffer(bufferSize / 2); // uint16_t buffer
+
+    // Create color space (Device RGB)
+    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+
+    // Bitmap info:
+    // 16-bit per channel, RGBA, big endian, no alpha premultiplied
+    CGBitmapInfo bitmapInfo =
+        kCGImageAlphaPremultipliedLast | // RGBA
+        kCGBitmapByteOrder16Host;         // 16-bit per component
+
+    CGContextRef context = CGBitmapContextCreate(
+        pixelBuffer.data(),
+        width,
+        height,
+        16,             // bits per component
+        bytesPerRow,
+        colorSpace,
+        bitmapInfo
+    );
+
+    CGColorSpaceRelease(colorSpace);
+
+    if (!context) {
+        std::cerr << "Failed to create bitmap context\n";
+        CGImageRelease(image);
+        return;
+    }
+
+    // Draw the image into the context (this converts it to 16-bit RGBA)
+    CGRect rect = CGRectMake(0, 0, width, height);
+    CGContextDrawImage(context, rect, image);
+
+    CGImageRelease(image);
+    CGContextRelease(context);
+
+    // Copy pixels into imageEdr->ImageData as float16 normalized [0.0..1.0]
+    imageEdr->Width = static_cast<uint32_t>(width);
+    imageEdr->Height = static_cast<uint32_t>(height);
+    imageEdr->ImageData.resize(imageEdr->Width * imageEdr->Height * 4);
+
+    float maxValue = 65535.0f; // max for 16-bit unsigned
+
+    for (uint32_t y = 0; y < imageEdr->Height; y++) {
+        for (uint32_t x = 0; x < imageEdr->Width; x++) {
+            size_t pixelIndex = (y * imageEdr->Width + x) * 4;
+            size_t bufferIndex = pixelIndex;
+
+            // Each channel is 16-bit unsigned integer
+            uint16_t r = pixelBuffer[bufferIndex + 0];
+            uint16_t g = pixelBuffer[bufferIndex + 1];
+            uint16_t b = pixelBuffer[bufferIndex + 2];
+            uint16_t a = pixelBuffer[bufferIndex + 3];
+
+            // Normalize to 0.0 - 1.0 float and convert to float16
+            float rf = static_cast<float>(r) / maxValue;
+            float gf = static_cast<float>(g) / maxValue;
+            float bf = static_cast<float>(b) / maxValue;
+            float af = static_cast<float>(a) / maxValue;
+
+            imageEdr->ImageData[pixelIndex + 0] = Float16_Emulation::float32_to_float16(rf);
+            imageEdr->ImageData[pixelIndex + 1] = Float16_Emulation::float32_to_float16(gf);
+            imageEdr->ImageData[pixelIndex + 2] = Float16_Emulation::float32_to_float16(bf);
+            imageEdr->ImageData[pixelIndex + 3] = Float16_Emulation::float32_to_float16(af);
+        }
+    }
+}
+
 
 struct AppState
 {
@@ -195,7 +337,8 @@ struct AppState
     void Update()
     {
         // CreateFloatPattern(&imageEdr, maxR, maxG, maxB);
-        LoadAvifImage(&imageEdr, "../Resources/assets/sample.avif");
+        // LoadAvifImage(&imageEdr, "../Resources/assets/sample.avif");
+        LoadAvifImageApple(&imageEdr, "../Resources/assets/sample.avif");
         imageMetal.StoreTextureFloat16Rgba(imageEdr.Width, imageEdr.Height, imageEdr.ImageData.data());
     }
 
