@@ -19,6 +19,13 @@ to see console logs, run
 /Users/ayk27/Desktop/hello_imgui_template/build/hello_edr.app/Contents/MacOS/hello_edr 
 */
 
+/*
+TODO
+color gamut mismatch, rendered as bt2020 but shown on ~p3 display. best to match mac exactly
+
+
+/*
+
 #ifdef HELLOIMGUI_HAS_METAL
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/internal/image_metal.h"
