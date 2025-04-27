@@ -14,6 +14,9 @@ use metal, so hello_edr can be successfully built
 /Users/ayk27/Desktop/Programs/CMake.app/Contents/bin/cmake -DHELLOIMGUI_HAS_METAL=ON -DHELLOIMGUI_HAS_OPENGL3=OFF ..
 
 make -j 8
+
+to see console logs, run
+/Users/ayk27/Desktop/hello_imgui_template/build/hello_edr.app/Contents/MacOS/hello_edr 
 */
 
 #ifdef HELLOIMGUI_HAS_METAL
@@ -98,6 +101,84 @@ void CreateFloatPattern(ImageEdr* imageEdr, float maxR, float maxG, float maxB)
     }
 }
 
+void LoadAvifImage(ImageEdr* imageEdr, const char* filePath)
+{
+    // Initialize AVIF decoder
+    avifDecoder* decoder = avifDecoderCreate();
+    avifResult result = avifDecoderSetIOFile(decoder, filePath);
+    if (result != AVIF_RESULT_OK) {
+        printf("Failed to open AVIF file: %s\n", avifResultToString(result));
+        avifDecoderDestroy(decoder);
+        return;
+    }
+
+    // Set strictness flags (optional, adjust as needed)
+    decoder->strictFlags = AVIF_STRICT_DISABLED;
+
+    // printf(filePath);
+
+    // Decode the AVIF image
+    result = avifDecoderParse(decoder);
+    if (result != AVIF_RESULT_OK) {
+        printf("Failed to decode AVIF image: %s\n", avifResultToString(result));
+        avifDecoderDestroy(decoder);
+        return;
+    }
+
+    printf("Decoded AVIF image: %ux%u\n", decoder->image->width, decoder->image->height);
+
+    avifImage* avifImg = decoder->image;
+
+    // Convert YUV to RGB
+    avifRGBImage rgb;
+    avifRGBImageSetDefaults(&rgb, avifImg);
+    rgb.format = AVIF_RGB_FORMAT_RGBA; // Use RGBA format
+    rgb.depth = 16; // Use 16-bit depth for high precision
+    avifRGBImageAllocatePixels(&rgb);
+
+    result = avifImageYUVToRGB(avifImg, &rgb);
+    if (result != AVIF_RESULT_OK) {
+        printf("Failed to convert YUV to RGB: %s\n", avifResultToString(result));
+        avifRGBImageFreePixels(&rgb);
+        avifDecoderDestroy(decoder);
+        return;
+    }
+
+    // Resize ImageEdr to match AVIF dimensions
+    imageEdr->Width = avifImg->width;
+    imageEdr->Height = avifImg->height;
+    imageEdr->ImageData.resize(imageEdr->Width * imageEdr->Height * 4);
+
+    // Convert RGB data to float (0.0 to 1.0)
+    uint16_t* rgbData = (uint16_t*)rgb.pixels;
+    float maxValue = (1 << rgb.depth) - 1;
+    for (uint32_t y = 0; y < avifImg->height; y++) {
+        for (uint32_t x = 0; x < avifImg->width; x++) {
+            int index = (y * avifImg->width + x) * 4;
+
+            // Extract pixel values
+            uint16_t r = rgbData[index + 0];
+            uint16_t g = rgbData[index + 1];
+            uint16_t b = rgbData[index + 2];
+
+            // Normalize to 0.0 - 1.0 range
+            float rf = (float)r / maxValue;
+            float gf = (float)g / maxValue;
+            float bf = (float)b / maxValue;
+
+            // Store in ImageData as float16
+            imageEdr->ImageData[index + 0] = Float16_Emulation::float32_to_float16(rf);
+            imageEdr->ImageData[index + 1] = Float16_Emulation::float32_to_float16(gf);
+            imageEdr->ImageData[index + 2] = Float16_Emulation::float32_to_float16(bf);
+            imageEdr->ImageData[index + 3] = Float16_Emulation::float32_to_float16(1.0f); // Alpha channel
+        }
+    }
+
+    // Cleanup
+    avifRGBImageFreePixels(&rgb);
+    avifDecoderDestroy(decoder);
+}
+
 
 struct AppState
 {
@@ -113,7 +194,8 @@ struct AppState
 
     void Update()
     {
-        CreateFloatPattern(&imageEdr, maxR, maxG, maxB);
+        // CreateFloatPattern(&imageEdr, maxR, maxG, maxB);
+        LoadAvifImage(&imageEdr, "../Resources/assets/sample.avif");
         imageMetal.StoreTextureFloat16Rgba(imageEdr.Width, imageEdr.Height, imageEdr.ImageData.data());
     }
 
