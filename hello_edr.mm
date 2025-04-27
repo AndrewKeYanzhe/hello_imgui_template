@@ -1,5 +1,21 @@
 // Demo of EDR (Extended Dynamic Range) support in Hello ImGui.
 
+//from https://github.com/pthom/hello_imgui/blob/master/src/hello_imgui_demos/hello_edr/hello_edr.mm
+
+/*
+
+Run in this order:
+mkdir build && cd build
+
+Fetch hello_imgui source
+/Users/ayk27/Desktop/Programs/CMake.app/Contents/bin/cmake ..
+
+use metal, so hello_edr can be successfully built
+/Users/ayk27/Desktop/Programs/CMake.app/Contents/bin/cmake -DHELLOIMGUI_HAS_METAL=ON -DHELLOIMGUI_HAS_OPENGL3=OFF ..
+
+make -j 8
+*/
+
 #ifdef HELLOIMGUI_HAS_METAL
 #include "hello_imgui/hello_imgui.h"
 #include "hello_imgui/internal/image_metal.h"
