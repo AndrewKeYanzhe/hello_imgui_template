@@ -46,7 +46,7 @@ if (EXAMPLE_INTEGRATION_PORTABLE_INSTALL)
     # portable installation is the easiest way to install the app
 
 
-
+    hello_imgui_add_app(hello_edr_og hello_edr_og.mm)
     hello_imgui_add_app(hello_edr hello_edr.mm)
     # Add include path and link path for libavif
     # this assumes homebrew is installed in $HOME/homebrew. change if necessary
