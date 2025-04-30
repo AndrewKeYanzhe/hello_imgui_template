@@ -1,4 +1,19 @@
+# Hello ImGui HDR
+
+## Notes by Andrew
+
+- Display HDR AVIF in metal layer
+- Issue: The HDR file is read as linear float, but interpreted as gamma (2.2?) encoded float when displayed as HDR. Therefore, the image looks more contrasty than expected
+  - Might be limitation of Hello ImGui https://github.com/pthom/hello_imgui/issues/144
+  - Current workaround: manually do gamma encoding on linear float values, but this may be imprecise
+- TODO: Input image is read as BT2020, and displayed on ~P3 display without gamut mapping.
+
+# 
+
+**Original readme continues below**
+
 # hello_imgui_template: get started with HelloImGui in 5 minutes 
+
 
 This template demonstrates how to easily integrate HelloImGui to your own project. 
 
